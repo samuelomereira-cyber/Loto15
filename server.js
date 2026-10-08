@@ -20,19 +20,28 @@ async function main(req,res){
  try{
   if(req.url.startsWith('/api/')&&limited(req))return json(res,429,{error:'Muitas requisições. Tente novamente.'});
   await db.expirePending(TTL);
-  if(req.method==='GET'&&req.url==='/api/health')return json(res,200,{ok:true,version:'16.1.0',database:db.dbMode(),paymentProvider:payment.configured()?'mercadopago':'sandbox',modalities:Object.keys(MODES)});
+  if(req.method==='GET'&&req.url==='/api/health')return json(res,200,{ok:true,version:'16.2.0',database:db.dbMode(),paymentProvider:payment.configured()?'mercadopago':'sandbox',modalities:Object.keys(MODES)});
   if(req.method==='POST'&&req.url==='/api/orders'){
-   const b=await read(req),mode=String(b.mode||''),quantity=Number(b.quantity),em=String(b.email||'').trim().toLowerCase();
-   if(!MODES[mode])return json(res,400,{error:'Modalidade inválida.'});if(![1,5].includes(quantity))return json(res,400,{error:'Quantidade inválida.'});if(!/^\S+@\S+\.\S+$/.test(em))return json(res,400,{error:'E-mail inválido.'});
+   const b=await read(req),mode=String(b.mode||''),quantity=Number(b.quantity);
+   if(!MODES[mode])return json(res,400,{error:'Modalidade inválida.'});if(![1,5].includes(quantity))return json(res,400,{error:'Quantidade inválida.'});
    const idem=String(req.headers['x-idempotency-key']||'');const existingId=await db.getOrderByIdempotency(idem);if(existingId){const existing=await db.getOrder(existingId);if(existing)return json(res,200,publicOrder(existing,undefined))}
-   const access=token(),o={id:id(),accessHash:hash(access),mode,quantity,price:quantity===1?1:3,email:em,status:'PENDING',createdAt:new Date().toISOString(),payment:null,games:null};
+   const access=token(),o={id:id(),accessHash:hash(access),mode,quantity,price:quantity===1?1:3,email:null,status:'PENDING',createdAt:new Date().toISOString(),payment:null,games:null};
    o.payment=await payment.createPixOrder(o);await db.saveOrder(o);if(idem)await db.saveIdempotency(idem,o.id);await db.addEvent('ORDER_CREATED',o,{mode,quantity,price:o.price});return json(res,201,publicOrder(o,access));
   }
   if(req.method==='GET'&&req.url.startsWith('/api/orders/')){const oid=req.url.split('/').pop(),o=await db.getOrder(oid);if(!o)return json(res,404,{error:'Pedido não encontrado'});if(o.status==='PENDING'&&payment.configured()){try{await confirmMP(o)}catch(e){console.warn('Falha ao atualizar pagamento:',e.message)}}return json(res,200,{id:o.id,mode:o.mode,quantity:o.quantity,price:o.price,status:o.status,generatedAt:o.generatedAt,hasGames:!!o.games,emailSent:!!o.emailResult?.sent,paymentMode:o.payment?.mode})}
   if(req.method==='POST'&&req.url==='/api/sandbox/confirm'){if(payment.configured())return json(res,403,{error:'Sandbox desativado'});const b=await read(req),o=await db.getOrder(b.id);if(!o)return json(res,404,{error:'Pedido não encontrado'});if(o.status!=='PENDING')return json(res,409,{error:'Pedido não está pendente'});if(expire(o)){await db.saveOrder(o);return json(res,410,{error:'Pedido expirado'})}o.status='PAID';o.paidAt=new Date().toISOString();await db.saveOrder(o);await db.addEvent('PAYMENT_CONFIRMED',o,{provider:'sandbox'});return json(res,200,{id:o.id,status:o.status})}
   if(req.method==='POST'&&req.url.startsWith('/api/webhooks/mercadopago')){if(!payment.configured()||!payment.webhookConfigured())return json(res,503,{error:'Mercado Pago/webhook não configurado'});const b=await read(req),u=new URL(req.url,'http://localhost'),pid=b?.data?.id||b?.id||u.searchParams.get('data.id');if(!payment.verifyWebhookSignature({xSignature:req.headers['x-signature'],xRequestId:req.headers['x-request-id'],dataId:pid}))return json(res,401,{error:'Assinatura inválida'});const o=await db.findOrderByPaymentId(pid);if(o)await confirmMP(o);return json(res,200,{received:true})}
   if(req.method==='POST'&&req.url==='/api/reveal'){const b=await read(req),o=await db.getOrder(b.id);if(!o)return json(res,404,{error:'Pedido não encontrado'});if(hash(String(b.accessToken||''))!==o.accessHash)return json(res,401,{error:'Acesso inválido'});if(o.status!=='PAID'&&payment.configured())await confirmMP(o);if(o.status!=='PAID')return json(res,403,{error:'Pagamento ainda não confirmado'});const games=await reveal(o);return json(res,200,{id:o.id,status:o.status,mode:o.mode,quantity:o.quantity,generatedAt:o.generatedAt,games,emailSent:!!o.emailResult?.sent})}
-  if(req.method==='GET'&&req.url==='/api/admin/summary'){if(!auth(req))return json(res,401,{error:'Não autorizado'});const s=await db.summary();return json(res,200,{version:'16.1.0',database:db.dbMode(),provider:payment.configured()?'mercadopago':'sandbox',totalOrders:s.total,pending:s.pending,paid:s.paid,released:s.released,revenue:s.revenue,orders:s.orders})}
+  if(req.method==='POST'&&req.url==='/api/email'){
+   const b=await read(req),o=await db.getOrder(b.id);if(!o)return json(res,404,{error:'Pedido não encontrado'});
+   if(hash(String(b.accessToken||''))!==o.accessHash)return json(res,401,{error:'Acesso inválido'});
+   if(o.status!=='PAID'||!o.games)return json(res,403,{error:'O pedido ainda não está liberado.'});
+   const em=String(b.email||'').trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(em))return json(res,400,{error:'E-mail inválido.'});
+   o.email=em;
+   try{o.emailResult=await email.sendGames({to:o.email,mode:o.mode,quantity:o.quantity,games:o.games,orderId:o.id});await db.saveOrder(o);await db.addEvent('EMAIL_REQUESTED',o,{sent:!!o.emailResult?.sent});return json(res,200,{id:o.id,sent:!!o.emailResult?.sent})}
+   catch(e){o.emailResult={sent:false,error:e.message};await db.saveOrder(o);return json(res,502,{error:e.message||'Falha no envio de e-mail.'})}
+  }
+  if(req.method==='GET'&&req.url==='/api/admin/summary'){if(!auth(req))return json(res,401,{error:'Não autorizado'});const s=await db.summary();return json(res,200,{version:'16.2.0',database:db.dbMode(),provider:payment.configured()?'mercadopago':'sandbox',totalOrders:s.total,pending:s.pending,paid:s.paid,released:s.released,revenue:s.revenue,orders:s.orders})}
   if(req.method==='GET'&&req.url==='/api/admin/events'){if(!auth(req))return json(res,401,{error:'Não autorizado'});return json(res,200,await db.listEvents(200))}
   const f=safeFile(req.url);if(req.method==='GET'&&f&&fs.existsSync(f)){res.writeHead(200,{'Content-Type':mime(path.extname(f)),'Cache-Control':'no-cache'});return fs.createReadStream(f).pipe(res)}
   return json(res,404,{error:'Não encontrado'});
