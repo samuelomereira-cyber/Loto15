@@ -20,7 +20,7 @@ async function main(req,res){
  try{
   if(req.url.startsWith('/api/')&&limited(req))return json(res,429,{error:'Muitas requisições. Tente novamente.'});
   await db.expirePending(TTL);
-  if(req.method==='GET'&&req.url==='/api/health')return json(res,200,{ok:true,version:'16.2.0',database:db.dbMode(),paymentProvider:payment.configured()?'mercadopago':'sandbox',modalities:Object.keys(MODES)});
+  if(req.method==='GET'&&req.url==='/api/health')return json(res,200,{ok:true,version:'16.4.0',database:db.dbMode(),paymentProvider:payment.configured()?'mercadopago':'sandbox',modalities:Object.keys(MODES)});
   if(req.method==='POST'&&req.url==='/api/orders'){
    const b=await read(req),mode=String(b.mode||''),quantity=Number(b.quantity);
    if(!MODES[mode])return json(res,400,{error:'Modalidade inválida.'});if(![1,5].includes(quantity))return json(res,400,{error:'Quantidade inválida.'});
@@ -41,7 +41,7 @@ async function main(req,res){
    try{o.emailResult=await email.sendGames({to:o.email,mode:o.mode,quantity:o.quantity,games:o.games,orderId:o.id});await db.saveOrder(o);await db.addEvent('EMAIL_REQUESTED',o,{sent:!!o.emailResult?.sent});return json(res,200,{id:o.id,sent:!!o.emailResult?.sent})}
    catch(e){o.emailResult={sent:false,error:e.message};await db.saveOrder(o);return json(res,502,{error:e.message||'Falha no envio de e-mail.'})}
   }
-  if(req.method==='GET'&&req.url==='/api/admin/summary'){if(!auth(req))return json(res,401,{error:'Não autorizado'});const s=await db.summary();return json(res,200,{version:'16.2.0',database:db.dbMode(),provider:payment.configured()?'mercadopago':'sandbox',totalOrders:s.total,pending:s.pending,paid:s.paid,released:s.released,revenue:s.revenue,orders:s.orders})}
+  if(req.method==='GET'&&req.url==='/api/admin/summary'){if(!auth(req))return json(res,401,{error:'Não autorizado'});const s=await db.summary();return json(res,200,{version:'16.4.0',database:db.dbMode(),provider:payment.configured()?'mercadopago':'sandbox',totalOrders:s.total,pending:s.pending,paid:s.paid,released:s.released,revenue:s.revenue,orders:s.orders})}
   if(req.method==='GET'&&req.url==='/api/admin/events'){if(!auth(req))return json(res,401,{error:'Não autorizado'});return json(res,200,await db.listEvents(200))}
   const f=safeFile(req.url);if(req.method==='GET'&&f&&fs.existsSync(f)){res.writeHead(200,{'Content-Type':mime(path.extname(f)),'Cache-Control':'no-cache'});return fs.createReadStream(f).pipe(res)}
   return json(res,404,{error:'Não encontrado'});

@@ -1,6 +1,6 @@
 {
   "name": "loto15-app",
-  "version": "16.2.0",
+  "version": "16.4.0",
   "private": true,
   "description": "LOTO15 multimodal — LOTO15, Mega-Sena e Quina com pagamento Pix e liberação pós-confirmação",
   "scripts": {
