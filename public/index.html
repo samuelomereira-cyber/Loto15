@@ -14,13 +14,13 @@ body{display:flex;justify-content:center;min-height:100vh}
 .art{display:block;width:100%;height:auto}
 .hit{position:absolute;border:0;background:transparent;padding:0;cursor:pointer}
 .hit:focus-visible{outline:2px solid #fff;outline-offset:2px}
-.modal{display:none;position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.82);align-items:flex-start;justify-content:center;padding:12px 14px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.card{width:min(520px,94vw);max-height:calc(100vh - 24px);overflow-y:auto;background:#07101d;border:2px solid #28baff;border-radius:20px;box-shadow:0 0 35px rgba(0,160,255,.4);padding:18px 20px 20px;line-height:1.35;margin:0 auto}
-h2{margin:0 0 6px;color:#ffd34d} p{color:#dce3ee}
+.modal{display:none;position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.82);align-items:center;justify-content:center;padding:18px}
+.card{width:min(520px,94vw);background:#07101d;border:2px solid #28baff;border-radius:20px;box-shadow:0 0 35px rgba(0,160,255,.4);padding:22px;line-height:1.35}
+h2{margin:0 0 8px;color:#ffd34d} p{color:#dce3ee}
 input{width:100%;padding:14px;border-radius:12px;border:1px solid #26baff;background:#02060b;color:#fff;font-size:16px;margin:8px 0}
 .btn{width:100%;padding:14px;border:0;border-radius:12px;background:#ffd34d;color:#171717;font-size:16px;font-weight:800;margin-top:10px}
 .secondary{background:#1a2535;color:#fff}
-.games{font-size:18px;font-weight:800;line-height:1.55;word-break:break-word;margin:6px 0 0}.release-email{margin-top:12px!important;padding:11px 12px!important;border-radius:14px;background:#07111f}.release-email p{margin:7px 0}.release-email .btn{margin-top:7px;padding:12px}.release-note{margin:10px 0 0}.modal-back{position:sticky;bottom:0;margin-top:12px;padding:12px 0 0;background:linear-gradient(to bottom,rgba(7,16,29,0),#07101d 24%);z-index:2}
+.games{font-size:19px;font-weight:800;line-height:1.8;word-break:break-word}
 .badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#29124f;color:#dca7ff;font-size:12px;font-weight:700;margin-bottom:8px}
 </style>
 </head>
@@ -48,28 +48,50 @@ input{width:100%;padding:14px;border-radius:12px;border:1px solid #26baff;backgr
     <div class="badge" id="badge">LOTO15</div>
     <h2 id="title">Seu pedido</h2>
     <div id="body"></div>
-    <div class="modal-back"><button class="btn secondary" onclick="closeModal()">VOLTAR</button></div>
+    <button class="btn secondary" onclick="closeModal()">VOLTAR</button>
   </div>
 </div>
 
 <script>
-let mode='LOTO15', qty=1, accessToken=null, orderId=null;
-const prices={1:'1,00',5:'3,00'}, tabs={LOTO15:'tab-loto','MEGA-SENA':'tab-mega',QUINA:'tab-quina'};
-function selectMode(m){mode=m;document.querySelectorAll('.tab-hit').forEach(b=>b.classList.remove('active'));document.getElementById(tabs[m]).classList.add('active');show('Modalidade selecionada',`<p><b>${escapeHtml(m)}</b> selecionada.</p><p>Escolha a quantidade para continuar.</p><button class="btn" onclick="startOrder(1)">GERAR 1 JOGO</button><button class="btn" onclick="startOrder(5)">GERAR 5 JOGOS</button>`)}
-function startOrder(n){qty=n;createOrder()}
-function openEmail(){showEmailChoice()}
-async function createOrder(){if(location.protocol!=='http:'&&location.protocol!=='https:'){show('Abra o LOTO15 pelo servidor','<p>Este arquivo foi aberto diretamente no celular (content:// ou file://). Para o pagamento e a geração dos jogos funcionarem, o LOTO15 precisa estar publicado em um endereço <b>https://</b> ou ser aberto pelo servidor Node.</p>');return}const idem=crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random();try{show('Criando pedido','<p>Aguarde. Estamos preparando seu pedido com segurança.</p>');const r=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json','X-Idempotency-Key':idem},body:JSON.stringify({mode,quantity:qty})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Não foi possível criar o pedido.');orderId=d.id;accessToken=d.accessToken||null;if(d.paymentMode==='mercadopago'){const pix=d.payment||{};show('Pagamento via PIX',`<p>Pedido: <b>${escapeHtml(d.id)}</b></p><p>Total: <b>R$ ${prices[qty]}</b></p>${pix.qrCode?`<p><b>PIX:</b></p>${pix.qrCodeBase64?`<img alt="QR Code PIX" style="display:block;width:min(280px,80vw);margin:12px auto;border-radius:16px;background:#fff;padding:10px" src="data:image/png;base64,${pix.qrCodeBase64}">`:''}<textarea id="pixcode" readonly style="width:100%;min-height:100px;padding:10px;background:#02060b;color:#fff;border:1px solid #26baff;border-radius:12px">${escapeHtml(pix.qrCode)}</textarea><button class="btn secondary" onclick="copyPix()">COPIAR PIX</button>`:''}${pix.checkoutUrl?`<button class="btn" onclick="location.href='${encodeURI(pix.checkoutUrl)}'">ABRIR PAGAMENTO</button>`:''}<button class="btn" onclick="checkPayment()">JÁ PAGUEI — VERIFICAR</button>`)}else{show('Pagamento de teste',`<p>Pedido criado: <b>${escapeHtml(d.id)}</b></p><p>Total: <b>R$ ${prices[qty]}</b></p><p>Ambiente de teste ativo. A liberação real só ocorre após confirmação do pagamento pelo servidor.</p><button class="btn" onclick="sandboxPay()">CONFIRMAR PAGAMENTO DE TESTE</button>`)}}catch(e){show('Não foi possível continuar',`<p>${escapeHtml(e.message)}</p><button class="btn" onclick="startOrder(${qty})">TENTAR NOVAMENTE</button>`)} }
-async function sandboxPay(){try{const r=await fetch('/api/sandbox/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:orderId})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha na confirmação.');await reveal()}catch(e){show('Pagamento de teste',`<p>${escapeHtml(e.message)}</p><div class="modal-back"><button class="btn secondary" onclick="closeModal()">VOLTAR</button></div>`)} }
-async function checkPayment(){try{show('Verificando pagamento','<p>Consultando a confirmação do pagamento...</p>');const r=await fetch('/api/reveal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:orderId,accessToken})});const d=await r.json();if(r.ok){renderReleased(d);return}if(r.status===403){show('Pagamento pendente','<p>Ainda não recebemos a confirmação. Aguarde alguns instantes e tente novamente.</p><button class="btn" onclick="checkPayment()">VERIFICAR NOVAMENTE</button>');return}throw new Error(d.error||'Não foi possível verificar o pagamento.')}catch(e){show('Erro',`<p>${escapeHtml(e.message)}</p><button class="btn" onclick="checkPayment()">TENTAR NOVAMENTE</button>`)} }
-async function reveal(){try{show('Liberando seus jogos','<p>Pagamento confirmado. Gerando suas combinações no servidor...</p>');const r=await fetch('/api/reveal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:orderId,accessToken})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Não foi possível liberar os jogos.');renderReleased(d)}catch(e){show('Não foi possível liberar',`<p>${escapeHtml(e.message)}</p>`)} }
-function renderReleased(d){const games=(d.games||[]).map(g=>g.game.map(x=>String(x).padStart(2,'0')).join(' '));const rows=games.map((g,i)=>String(i+1).padStart(2,'0')+' — '+g).join('<br>');show('Jogos liberados',`<p><b>${escapeHtml(d.mode)}</b> — ${d.quantity} jogo${d.quantity>1?'s':''}</p><div class="games">${rows}</div><div id="emailArea" class="release-email"><p><b>📧 Quer receber estes mesmos jogos por e-mail?</b></p><p style="font-size:.88em">Opcional. Você já pode guardar os jogos nesta tela.</p><button class="btn" onclick="showEmailForm()">SIM, ENVIAR POR E-MAIL</button><button class="btn secondary" onclick="skipEmail()">NÃO, CONTINUAR SEM E-MAIL</button></div><p id="emailStatus" style="display:none"></p><p class="release-note"><small>Faça a aposta separadamente em uma lotérica ou canal oficial da loteria.</small></p>`)}
-function showEmailForm(){const a=document.getElementById('emailArea');if(!a)return;a.innerHTML=`<p><b>📧 Informe seu e-mail</b></p><input id="emailAfter" type="email" autocomplete="email" placeholder="Seu melhor e-mail" style="width:100%;box-sizing:border-box;padding:13px;background:#02060b;color:#fff;border:1px solid #26baff;border-radius:12px"><button class="btn" onclick="sendEmailAfterPayment()">ENVIAR MEUS JOGOS</button><button class="btn secondary" onclick="skipEmail()">NÃO, CONTINUAR SEM E-MAIL</button>`}
-function skipEmail(){const a=document.getElementById('emailArea');if(a)a.innerHTML='<p><b>✓ Tudo certo.</b> Seus jogos continuam disponíveis nesta tela.</p>'}
-async function sendEmailAfterPayment(){const input=document.getElementById('emailAfter');const email=String(input?.value||'').trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(email)){alert('Informe um e-mail válido.');return}try{const r=await fetch('/api/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:orderId,accessToken,email})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Não foi possível enviar os jogos.');const a=document.getElementById('emailArea');if(a)a.innerHTML=d.sent?'<p><b>✓ Enviado!</b> Os mesmos jogos deste pedido foram enviados para o e-mail informado.</p>':'<p><b>✓ E-mail registrado.</b> O provedor de envio ainda não está configurado neste ambiente de teste.</p>'}catch(e){alert(e.message)}}
-async function copyPix(){const el=document.getElementById('pixcode');try{await navigator.clipboard.writeText(el.value);alert('Código PIX copiado.')}catch{el.select();document.execCommand('copy');alert('Código PIX copiado.')}}
-function show(title,body){document.getElementById('badge').textContent=mode;document.getElementById('title').textContent=title;document.getElementById('body').innerHTML=body;document.getElementById('modal').style.display='flex'}
-function closeModal(){document.getElementById('modal').style.display='none'}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+let mode='LOTO15', qty=1;
+const rules={'LOTO15':{n:15,max:25},'MEGA-SENA':{n:6,max:60},'QUINA':{n:5,max:80}};
+
+function selectMode(m){
+  mode=m;
+  document.querySelectorAll('.tab-hit').forEach(b=>b.classList.remove('active'));
+  document.getElementById(m==='LOTO15'?'tab-loto':m==='MEGA-SENA'?'tab-mega':'tab-quina').classList.add('active');
+  show('Modalidade selecionada', `<p><b>${m}</b> selecionada.</p><p>O gerador correspondente a esta modalidade está pronto.</p><button class="btn" onclick="startOrder(1)">GERAR 1 JOGO</button><button class="btn" onclick="startOrder(5)">GERAR 5 JOGOS</button>`);
+}
+function startOrder(n){
+  qty=n;
+  show('Informe seu e-mail', `<p>Modalidade: <b>${mode}</b><br>Quantidade: <b>${n}</b> jogo${n>1?'s':''}<br>Valor de teste: <b>R$ ${n===1?'1,00':'3,00'}</b></p><input id="email" type="email" placeholder="Seu melhor e-mail"><button class="btn" onclick="continuePayment()">CONTINUAR PARA PAGAMENTO</button>`);
+}
+function openEmail(){
+  startOrder(qty);
+}
+function continuePayment(){
+  const email=document.getElementById('email')?.value.trim();
+  if(!email || !email.includes('@')){ alert('Informe um e-mail válido.'); return; }
+  show('Pagamento de teste', `<p>E-mail: <b>${escapeHtml(email)}</b></p><p>Modalidade: <b>${mode}</b><br>Quantidade: <b>${qty}</b><br>Total: <b>R$ ${qty===1?'1,00':'3,00'}</b></p><p>Este botão simula a confirmação do pagamento. No ambiente real, a liberação ocorrerá somente após a confirmação do Pix pelo servidor.</p><button class="btn" onclick="reveal()">CONFIRMAR PAGAMENTO DE TESTE</button>`);
+}
+function reveal(){
+  const games=[];
+  for(let i=0;i<qty;i++) games.push(makeGame(mode));
+  show('Jogos liberados', `<p><b>${mode}</b> — ${qty} jogo${qty>1?'s':''}</p><div class="games">${games.map((g,i)=>String(i+1).padStart(2,'0')+' — '+g.join(' ')).join('<br>')}</div><p>Teste concluído. Na versão de produção, estes jogos serão associados ao pedido confirmado e enviados ao e-mail.</p>`);
+}
+function makeGame(m){
+  const r=rules[m], a=[];
+  while(a.length<r.n){let x=Math.floor(Math.random()*r.max)+1;if(!a.includes(x))a.push(x);}
+  return a.sort((a,b)=>a-b).map(x=>String(x).padStart(2,'0'));
+}
+function show(title,body){
+  document.getElementById('badge').textContent=mode;
+  document.getElementById('title').textContent=title;
+  document.getElementById('body').innerHTML=body;
+  document.getElementById('modal').style.display='flex';
+}
+function closeModal(){document.getElementById('modal').style.display='none';}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 </script>
 </body>
 </html>
