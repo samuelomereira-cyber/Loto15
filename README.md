@@ -1,4 +1,4 @@
-# LOTO15 — V16.1 produção preparada
+# LOTO15 — V16.2 produção preparada
 
 Esta versão mantém a interface V17 aprovada e acrescenta persistência PostgreSQL opcional, mantendo `data.json` apenas como fallback local de desenvolvimento.
 
@@ -58,7 +58,7 @@ A confirmação em produção usa a Orders API do Mercado Pago: a order é consi
 - Busca de pedido por identificador de pagamento otimizada no PostgreSQL para webhooks.
 - Rate limit aplicado às rotas de API, sem bloquear a navegação dos arquivos públicos.
 - Páginas de termos e privacidade não dependem de arquivo CSS inexistente.
-- Versão de health check atualizada para 16.1.0.
+- Versão de health check atualizada para 16.2.0.
 
 ## Publicação
 O arquivo HTML não deve ser aberto diretamente como `file://` ou `content://`. Em produção, publique o projeto em HTTPS e defina as variáveis de ambiente do Render/host. O Mercado Pago documenta atualmente a criação de Pix via `/v1/orders`, com `X-Idempotency-Key`, `external_reference`, `processing_mode` e `expiration_time`; a documentação também recomenda Webhooks e consulta da order por `/v1/orders/{id}` para obter o estado atualizado.

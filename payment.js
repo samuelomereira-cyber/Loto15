@@ -8,7 +8,7 @@ function verifyWebhookSignature({xSignature,xRequestId,dataId}){if(!webhookConfi
 async function createPixOrder(order){
  if(!configured()) return {mode:'sandbox',externalId:null,qrCode:`PIX-DEMO-${order.id}`,qrCodeBase64:null,checkoutUrl:null,rawStatus:'pending'};
  const idem=crypto.randomUUID();
- const payload={type:'online',external_reference:order.id,total_amount:order.price.toFixed(2),processing_mode:'automatic',expiration_time:'PT30M',payer:{email:order.email},transactions:{payments:[{amount:order.price.toFixed(2),payment_method:{id:'pix',type:'bank_transfer'}}]}};
+ const payload={type:'online',external_reference:order.id,total_amount:order.price.toFixed(2),processing_mode:'automatic',expiration_time:'PT30M',payer:{email:order.email||('pedido-'+order.id.toLowerCase()+'@loto15.com.br')},transactions:{payments:[{amount:order.price.toFixed(2),payment_method:{id:'pix',type:'bank_transfer'}}]}};
  const data=await mp('/v1/orders',{method:'POST',headers:{'X-Idempotency-Key':idem},body:JSON.stringify(payload)});
  const p=data?.transactions?.payments?.[0]||{};const pm=p.payment_method||{};
  return {mode:'mercadopago',externalId:p.id||data.id||null,orderId:data.id||null,qrCode:pm.qr_code||p.qr_code||null,qrCodeBase64:pm.qr_code_base64||p.qr_code_base64||null,checkoutUrl:data.checkout_url||null,rawStatus:p.status||data.status||'pending'};

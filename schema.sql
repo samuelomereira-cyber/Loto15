@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS orders (
   mode TEXT NOT NULL,
   quantity INTEGER NOT NULL,
   price NUMERIC(10,2) NOT NULL,
-  email TEXT NOT NULL,
+  email TEXT,
   status TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
   paid_at TIMESTAMPTZ,

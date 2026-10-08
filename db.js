@@ -33,7 +33,7 @@ async function init(){
           mode TEXT NOT NULL,
           quantity INTEGER NOT NULL,
           price NUMERIC(10,2) NOT NULL,
-          email TEXT NOT NULL,
+          email TEXT,
           status TEXT NOT NULL,
           created_at TIMESTAMPTZ NOT NULL,
           paid_at TIMESTAMPTZ,
@@ -59,6 +59,7 @@ async function init(){
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
       `);
+      await pool.query('ALTER TABLE orders ALTER COLUMN email DROP NOT NULL');
       mode='postgres';
       return;
     } catch(e){
