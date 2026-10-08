@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: loto15-app
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: REQUIRE_POSTGRES
+        value: "true"
+      - key: PAYMENT_PROVIDER
+        value: mercadopago
+      - key: ADMIN_KEY
+        sync: false
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: MP_WEBHOOK_SECRET
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: ORDER_TTL_MINUTES
+        value: "30"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: MP_WEBHOOK_MAX_AGE_MS
+        value: "300000"
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
